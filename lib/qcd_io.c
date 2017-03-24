@@ -1770,6 +1770,7 @@ int qcd_writeVectorLime(char *fname, int type, qcd_vector *v)
    char *buffer;
    qcd_uint_4 x,y,z,t;
    char tmp_string[2048];
+   unsigned int buf_size,j;
 
    if(!v->initialized)
    {
@@ -1904,7 +1905,7 @@ int qcd_writeVectorLime(char *fname, int type, qcd_vector *v)
    MPI_File_set_view(mpifid, offset, MPI_FLOAT, subblock, "native", MPI_INFO_NULL);
 
    chunksize=4*3*sizeof(qcd_complex_16);
-   buffer = (char*) malloc(chunksize*v->geo->lV);
+   buffer = (char*) malloc(chunksize*(unsigned long long int)v->geo->lV);
    if(buffer==NULL)
    {
      fprintf(stderr,"process %i: Error in %s! Out of memory\n",v->geo->myid, __func__);
@@ -1924,8 +1925,13 @@ int qcd_writeVectorLime(char *fname, int type, qcd_vector *v)
 	 }
    if(!qcd_isBigEndian())
      qcd_swap_8((double*) buffer,(size_t)(2*4*3)*(size_t)v->geo->lV);
-   
-   MPI_File_write_all(mpifid, buffer, 4*3*2*v->geo->lV, MPI_DOUBLE, &status);
+     sizes[1]=v->geo->L[2];
+   sizes[2]=v->geo->L[3];
+   sizes[3]=v->geo->L[0];
+
+   buf_size=4*3*2*v->geo->L[1]*v->geo->L[2]*v->geo->L[3];
+   for ( j=0; j< v->geo->L[0]; j++)
+	   MPI_File_write_all(mpifid, (((double *) buffer) +j*buf_size), buf_size, MPI_DOUBLE, &status);
 
    free(buffer);
    MPI_File_close(&mpifid);

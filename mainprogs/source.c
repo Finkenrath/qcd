@@ -16,7 +16,8 @@
  
 enum {
   POINT_SOURCE,
-  NOISE_SOURCE
+  NOISE_SOURCE,
+  NOISE_SPINSOURCE
 } src_type;
  
 int main(int argc,char* argv[])
@@ -31,7 +32,7 @@ int main(int argc,char* argv[])
    qcd_int_4   x_src[4],lx_src[4],i,nsmear,nsmearAPE;
    qcd_real_8   alpha,alphaAPE,plaq;
    int   params_len;   
-
+   int sp_old;
    qcd_geometry geo;
    qcd_gaugeField u, uAPE;
    qcd_gaugeField *u_ptr, *uAPE_ptr, *utmp_ptr;
@@ -91,6 +92,10 @@ int main(int argc,char* argv[])
      {
        src_type = NOISE_SOURCE;
      }
+   else if(strcmp(src_type_s, "SpinNoise") == 0)
+     {
+       src_type = NOISE_SPINSOURCE;
+     }
    else
      {
        if(myid == 0)
@@ -127,6 +132,18 @@ int main(int argc,char* argv[])
        break;
        
      case NOISE_SOURCE:
+       sscanf(qcd_getParam("<n_sources>",params, params_len), "%d", &numb_sources);
+       if(myid==0) printf(" Got numb. sources: %d\n", numb_sources);
+
+       sscanf(qcd_getParam("<rng_seed>",params, params_len), "%lu", &seed);
+       if(myid==0) printf(" Got rng seed: %lu\n", seed);
+
+       sscanf(qcd_getParam("<source_pos_t>",params,params_len),"%d",&x_src[0]);
+       if(myid==0) printf(" Got noise-source t-slice: %d\n",x_src[0]);
+        
+       break;
+       
+     case NOISE_SPINSOURCE:
        sscanf(qcd_getParam("<n_sources>",params, params_len), "%d", &numb_sources);
        if(myid==0) printf(" Got numb. sources: %d\n", numb_sources);
 
@@ -185,7 +202,8 @@ int main(int argc,char* argv[])
      }
    
    qcd_initVector(&vec,&geo);
-  
+ 
+   sp_old=-1;
    for(i=0; i<4; i++)
       lx_src[i] = x_src[i]-geo.Pos[i]*geo.lL[i];  //source_pos in local lattice
        
@@ -205,6 +223,25 @@ int main(int argc,char* argv[])
 	 {
 	   qcd_z2Vector(&vec, x_src[0]);
 	 }
+       else if (src_type == NOISE_SPINSOURCE)
+       {
+
+
+	int sp = is % 4;
+	
+	if (sp==0)
+	{
+		qcd_z2SpinVector(&vec, x_src[0], sp);
+		sp_old=sp;
+	}
+	else
+	{
+		qcd_z2SpinVector_switch(&vec, x_src[0], sp, sp_old);
+		sp_old=sp;
+	}
+        }
+
+
 
        for(i=0; i<nsmear; i++)
 	 {
@@ -214,6 +251,9 @@ int main(int argc,char* argv[])
 	       exit(EXIT_FAILURE);
 	     }
 	 }
+
+
+
 
        //qcd_copyPropagatorVector(&source, &vec, mu, col);
        //qcd_writeVector(vec_names[is],qcd_PROP_LIME,mu,col,&vec);
